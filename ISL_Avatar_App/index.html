@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ISL Avatar Prototype</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#0f1720;--panel:#16202b;--panel2:#1d2a38;--text:#e8eef5;--muted:#93a4b8;--accent:#4fb3ff;--warn:#f5b84a;--line:#2a3a4c;--red:#e5484d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:15px/1.45 "Segoe UI",system-ui,Roboto,sans-serif}
+#app{display:grid;grid-template-columns:1fr 430px;height:100vh}
+#stage{position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 35%,#27405a,#0f1720 72%)}
+#stage canvas{display:block}
+#status{position:absolute;top:12px;left:12px;font-size:13px;color:var(--muted);background:#0009;padding:6px 10px;border-radius:8px}
+#badge{position:absolute;top:12px;right:12px;font-size:12px;color:#f9d79a;background:#f5b84a22;border:1px solid #f5b84a55;padding:5px 9px;border-radius:8px}
+#caption{position:absolute;left:16px;right:16px;bottom:16px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;pointer-events:none}
+.chip{padding:5px 11px;border-radius:999px;background:#0b1118cc;border:1px solid #ffffff2a;font-size:17px}
+.chip.unknown{color:var(--warn);border-style:dashed;border-color:#f5b84a88}
+.chip.active{background:var(--accent);color:#04121f;border-color:var(--accent)}
+.chip.unknown.active{background:var(--warn);color:#1f1400}
+.chip.done{opacity:.5}
+.chip.skipped{opacity:.35;text-decoration:line-through}
+#loader{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:#0b1118f2;text-align:center;padding:28px}
+#loader.show{display:flex}
+#loader p{max-width:520px;color:var(--muted);margin:0}
+aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:auto}
+header{padding:16px 18px 6px}
+h1{font-size:18px;margin:0}
+h2{font-size:13px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.sub{color:var(--muted);font-size:13px}
+.tabs{display:flex;gap:8px;padding:10px 18px}
+.tab{flex:1;padding:11px 4px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer;font-weight:600;font-size:15px}
+.tab.on{background:var(--accent);color:#04121f;border-color:var(--accent)}
+section{padding:4px 18px}
+textarea{width:100%;min-height:100px;resize:vertical;background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font:inherit}
+button{font:inherit}
+.btn{padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#04121f;font-weight:700}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
+.mic{width:100%;padding:16px;font-size:16px;font-weight:700}
+.mic.live{background:var(--red);border-color:var(--red);color:#fff}
+#transcript{min-height:80px;max-height:180px;overflow:auto;background:#0d151d;border:1px solid var(--line);border-radius:10px;padding:10px;margin-top:8px}
+#interim{color:var(--muted)}
+.pill{font-size:13px;padding:5px 10px;border-radius:999px}
+.lex{display:flex;flex-wrap:wrap;gap:6px}
+.lex button{font-size:12px;padding:5px 9px;border-radius:8px}
+label{font-size:13px;color:var(--muted)}
+select{background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px}
+.hidden{display:none!important}
+.warnbox{background:#f5b84a1a;border:1px solid #f5b84a55;color:#f9d79a;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px}
+#camView{position:absolute;inset:0;background:#05080c;display:flex;align-items:center;justify-content:center;z-index:2}
+.camBox{position:relative;height:100%;max-width:100%;aspect-ratio:4/3}
+.camBox video,.camBox canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transform:scaleX(-1)}
+#camMsg{position:absolute;top:56px;left:50%;transform:translateX(-50%);background:#f5b84ae6;color:#1f1400;font-weight:700;padding:7px 14px;border-radius:999px;font-size:15px;white-space:nowrap}
+#camCount{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:140px;font-weight:800;color:#fff;text-shadow:0 4px 30px #000;pointer-events:none}
+#camRec{position:absolute;left:16px;right:16px;bottom:16px;background:#0b1118d9;border-radius:10px;padding:8px 12px;color:#ff6b6b;font-weight:700}
+#camRec .track{height:6px;background:#ffffff22;border-radius:3px;margin-top:6px;overflow:hidden}#recBar{height:100%;width:0;background:#e5484d}
+#camResult{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);background:var(--accent);color:#04121f;font-size:30px;font-weight:800;padding:8px 22px;border-radius:14px}
+#camResult.bad{background:#f5b84a;color:#1f1400;font-size:22px}
+.okbox{background:#3fb98a1a;border:1px solid #3fb98a66;color:#bfeedd;border-radius:10px;padding:8px 10px;font-size:13px;margin-top:8px}
+.okbox a{color:#9be3c4}
+#liveVideoBox{position:absolute;top:56px;left:12px;width:min(42%,520px);background:#000;border:1px solid #ffffff22;border-radius:10px;overflow:hidden;box-shadow:0 8px 30px #0008;z-index:1}
+#liveVideoBox video{display:block;width:100%;max-height:45vh;background:#000}
+#lagBadge{position:absolute;top:46px;right:12px;font-size:12px;font-weight:700;color:#d6f5e6;background:#3fb98a33;border:1px solid #3fb98a77;padding:5px 10px;border-radius:999px;white-space:nowrap}
+#lagBadge.warn{color:#f9d79a;background:#f5b84a22;border-color:#f5b84a77}
+#liveCap{position:absolute;left:50%;transform:translateX(-50%);bottom:62px;width:min(92%,900px);text-align:center;font-size:20px;line-height:1.35;color:#fff;background:#000000b3;padding:8px 14px;border-radius:10px;pointer-events:none}
+#liveCap .interim{color:#9fb3c8}
+.transcriptBox{max-height:200px;overflow:auto;background:#0d151d;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px;line-height:1.45}
+.transcriptBox .ts{color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.transcriptBox .low{color:#f5b84a}
+.btn.mic.live{background:var(--red);border-color:var(--red);color:#fff}
+#camIdle{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;color:var(--muted);padding:40px;font-size:16px;max-width:520px;margin:auto}
+#camIdle b{color:var(--text);font-size:18px}
+#camFps{position:absolute;top:12px;left:12px;font-size:12px;color:var(--muted);background:#0009;padding:4px 8px;border-radius:6px}
+#camModeBadge{position:absolute;top:12px;right:12px;font-size:12px;font-weight:700;color:#04121f;background:#93a4b8;padding:4px 9px;border-radius:6px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:10px}
+.seg button{flex:1;padding:9px;background:var(--panel2);color:var(--text);border:0;cursor:pointer;font-weight:600}
+.seg button.on{background:#2b4a66;color:#fff}
+.card{background:#0d151d;border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:10px}
+.card[data-status=needs_confirmation]{border-color:var(--accent)}
+.card[data-status=uncertain_repeat],.card[data-status=unsupported],.card[data-status=no_sign_detected]{border-color:#f5b84a88}
+#resText{font-size:28px;font-weight:800}
+.cand{display:grid;grid-template-columns:110px 1fr 44px;gap:8px;align-items:center;width:100%;background:transparent;border:1px solid transparent;color:var(--text);padding:5px 6px;border-radius:8px;cursor:pointer;text-align:left}
+.cand:hover{border-color:var(--accent)}
+.cand .bar{height:8px;background:#ffffff14;border-radius:4px;overflow:hidden}.cand .bar i{display:block;height:100%;background:var(--accent)}
+.cand .pct{font-size:12px;color:var(--muted);text-align:right}
+.sentence{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;background:#0d151d;border:1px solid var(--line);border-radius:10px;padding:8px}
+.sentence .chip{font-size:15px;cursor:pointer}
+.lex .btn.ready{border-color:#3fb98a;color:#9be3c4}
+.note{font-size:12px;color:var(--muted);border-top:1px solid var(--line);margin-top:auto;padding:12px 18px}
+</style>
+<script>
+if (location.protocol === 'file:') document.addEventListener('DOMContentLoaded', () => {
+  document.body.innerHTML = '<div style="max-width:560px;margin:15vh auto;padding:24px;font:16px/1.5 Segoe UI,sans-serif;color:#e8eef5;background:#16202b;border:1px solid #2a3a4c;border-radius:12px">'
+   + '<h2 style="margin-top:0">Please start the app with <b>start_app.bat</b></h2>'
+   + '<p>Browsers block 3D models, scripts and the microphone for pages opened by double-clicking. Close this tab, then double-click <b>start_app.bat</b> in the same folder. It opens the app at <b>http://localhost:8765</b>.</p></div>';
+});
+</script>
+<script type="importmap">
+{"imports":{"three":"./lib/three.module.js","three/addons/":"./lib/addons/"}}
+</script>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="status">Loading avatar…</div>
+    <div id="badge">Prototype · signs not yet reviewed by ISL users</div>
+    <div id="liveVideoBox" class="hidden"><video id="liveVideo" playsinline></video></div>
+    <div id="lagBadge" class="hidden"></div>
+    <div id="liveCap" class="hidden"></div>
+    <div id="caption"></div>
+    <div id="camView" class="hidden">
+      <div class="camBox"><video id="cam" playsinline muted></video><canvas id="camCanvas"></canvas></div>
+      <div id="camIdle"><div style="font-size:44px">📷</div><b>Camera is off</b><span>Press <b>Start camera</b> on the right. Sit about an arm's length away with your head, chest and both hands in view, facing a light.</span></div>
+      <div id="camFps"></div><div id="camModeBadge">RECOGNISE</div>
+      <div id="camMsg" class="hidden"></div>
+      <div id="camCount"></div>
+      <div id="camResult" class="hidden"></div>
+      <div id="camRec" class="hidden">● Recording — sign now<div class="track"><div id="recBar"></div></div></div>
+    </div>
+    <div id="loader">
+      <h2 style="color:var(--text);font-size:16px;text-transform:none;letter-spacing:0">Load the avatar</h2>
+      <p>The app couldn't find <b>avatar.glb</b> next to index.html. Put it back in the app folder, or pick the file here once and it will be remembered on this laptop.</p>
+      <input type="file" id="glbInput" accept=".glb">
+      <p id="loadErr" style="color:var(--warn)"></p>
+    </div>
+  </div>
+  <aside>
+    <header>
+      <h1>ISL Avatar</h1>
+      <div class="sub">Type or speak — the avatar signs each word it knows. Words it doesn't know are shown in amber and not signed.</div>
+    </header>
+    <div class="tabs">
+      <button class="tab on" data-tab="text">⌨ Text</button>
+      <button class="tab" data-tab="speech">🎙 Speech</button>
+      <button class="tab" data-tab="camera">📷 Camera</button>
+      <button class="tab" data-tab="live">📺 Live</button>
+    </div>
+
+    <section id="tab-text">
+      <textarea id="textIn" placeholder="e.g. Hello, thank you. Please help me.">Hello! Thank you. Please help me.</textarea>
+      <div class="row">
+        <button class="btn primary" id="signBtn">Sign it</button>
+        <button class="btn" id="replayBtn">Replay</button>
+        <button class="btn" id="stopBtn">Stop</button>
+      </div>
+      <div class="row">
+        <button class="btn pill ex">Hello, what is your name?</button>
+        <button class="btn pill ex">Sorry, I can't come today</button>
+        <button class="btn pill ex">Stop, wait!</button>
+        <button class="btn pill ex">One two three four five</button>
+      </div>
+    </section>
+
+    <section id="tab-speech" class="hidden">
+      <div class="row" style="margin-top:0">
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option value="en-IN" selected>English (India)</option>
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+        </select>
+      </div>
+      <div class="row"><button class="btn mic" id="micBtn">Start listening</button></div>
+      <div id="transcript"><span id="finalTxt"></span> <span id="interim"></span></div>
+      <div id="micHelp" class="warnbox hidden"></div>
+    </section>
+
+    <section id="tab-camera" class="hidden">
+      <div class="sub">Sign to the webcam — the app reads your hands and turns taught signs into text and speech. Video never leaves this laptop.</div>
+      <div class="row">
+        <button class="btn primary" id="camStart">Start camera</button>
+        <span id="camState" class="sub">Camera off</span>
+      </div>
+      <div id="camHelp" class="warnbox hidden"></div>
+      <div id="modelState" class="sub" style="margin-top:8px">Checking for a trained model…</div>
+      <div id="modelSigns" class="sub hidden" style="margin-top:4px;max-height:110px;overflow:auto"></div>
+      <div class="seg" id="camModeSeg"><button data-mode="recognize" class="on">Recognise</button><button data-mode="teach">Teach signs</button></div>
+      <div class="row">
+        <label><input type="checkbox" id="autoSeg"> Automatic: start when hands rise, stop when they drop</label>
+      </div>
+      <div class="row" style="margin-top:4px">
+        <label for="recLen">Recording length (button mode)</label>
+        <select id="recLen"><option value="1.5">1.5 s</option><option value="2" selected>2 s</option><option value="3">3 s</option></select>
+      </div>
+
+      <div id="teachPanel" class="hidden">
+        <h2>Teach a sign</h2>
+        <div class="row" style="margin-top:0">
+          <select id="teachLabel"></select>
+          <input id="customLabel" placeholder="or type a new word" style="flex:1;min-width:120px;background:#0d151d;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:6px">
+        </div>
+        <div class="row">
+          <button class="btn primary" id="recBtn">● Record sample (Space)</button>
+          <button class="btn" id="undoBtn">Undo last</button>
+        </div>
+        <div class="sub" id="teachHint" style="margin-top:6px">Pick a sign, press Record (or Space), and sign it after the 3-2-1. Record each sign 5 times, moving slightly between takes.</div>
+        <h2>Taught signs · <span id="readyCount">0 signs ready</span></h2>
+        <div class="lex" id="sampleList"></div>
+        <div class="row">
+          <button class="btn" id="evalBtn">Check accuracy</button>
+          <button class="btn" id="exportBtn">Export</button>
+          <label class="btn" style="color:var(--text);font-size:15px">Import<input type="file" id="importIn" accept=".json" hidden></label>
+          <button class="btn" id="clearBtn">Delete all</button>
+        </div>
+        <div id="evalOut" class="sub" style="margin-top:6px"></div>
+      </div>
+
+      <div id="recogPanel">
+        <div class="row">
+          <button class="btn primary" id="signNowBtn">Sign now (Space)</button>
+        </div>
+        <div class="row hidden" id="sourceRow">
+          <label for="source">Recognise using</label>
+          <select id="source"><option value="both" selected>Trained model + my taught signs</option><option value="model">Trained model only</option><option value="mine">My taught signs only</option></select>
+        </div>
+        <div id="resultCard" class="card hidden">
+          <div id="resText">—</div>
+          <div id="resStatus" class="sub"></div>
+          <div id="resCands" style="margin-top:8px"></div>
+          <div class="row">
+            <button class="btn primary" id="confirmBtn">✓ Confirm (Enter)</button>
+            <button class="btn" id="retryBtn">Retry</button>
+          </div>
+          <div class="sub" style="margin-top:4px">Wrong? Click the right word above.</div>
+        </div>
+        <h2>Message</h2>
+        <div id="sentence" class="sentence"></div>
+        <div class="row">
+          <button class="btn" id="speakAll">🔊 Speak message</button>
+          <button class="btn" id="clearSentence">Clear</button>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="autoSpeak" checked> Speak each confirmed word</label>
+          <label><input type="checkbox" id="learn" checked> Learn from my corrections</label>
+        </div>
+        <div class="row">
+          <label for="strict">Strictness</label>
+          <select id="strict"><option value="2.0">Lenient</option><option value="1.5" selected>Normal</option><option value="1.2">Strict</option></select>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-live" class="hidden">
+      <div class="sub">Turn live news or any video into captions and avatar signing.</div>
+      <div class="row">
+        <label for="liveSource">Source</label>
+        <select id="liveSource" style="flex:1">
+          <option value="file" selected>Video file on this laptop</option>
+          <option value="tab">Another Chrome tab (YouTube, news sites…)</option>
+          <option value="mic">Microphone (TV / radio in the room)</option>
+        </select>
+      </div>
+      <div class="sub" id="liveSourceHint" style="margin-top:6px"></div>
+      <div id="liveFileRow">
+        <div class="row">
+          <label class="btn">🎬 Choose video<input type="file" id="liveFile" accept="video/*,audio/*" hidden></label>
+          <span id="liveFileName" class="sub"></span>
+        </div>
+        <div class="row">
+          <label class="btn">💬 Subtitles (optional)<input type="file" id="liveSubs" accept=".srt,.vtt,text/vtt" hidden></label>
+          <span id="liveSubsName" class="sub"></span>
+        </div>
+      </div>
+      <div class="row" id="liveLangRow">
+        <label for="liveLang">Spoken language</label>
+        <select id="liveLang">
+          <option value="en-IN" selected>English (India)</option>
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="hi-IN">Hindi (captions only)</option>
+          <option value="ta-IN">Tamil (captions only)</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="lagMode">When signing falls behind</label>
+        <select id="lagMode" style="flex:1">
+          <option value="live" selected>Keep up: speed up, skip words if far behind</option>
+          <option value="pause">Pause the video until signing catches up</option>
+          <option value="all">Sign everything (may lag)</option>
+        </select>
+      </div>
+      <div class="row"><button class="btn mic" id="liveStart">▶ Start</button></div>
+      <div class="sub" id="liveState">Stopped</div>
+      <div id="liveHelp" class="warnbox hidden"></div>
+      <div id="liveSRNote" class="warnbox hidden">Speech recognition needs Google Chrome. Subtitle files work in any browser.</div>
+      <h2>Live captions</h2>
+      <div id="liveTranscript" class="transcriptBox"><span class="sub">Captions will appear here.</span></div>
+      <div class="sub" style="margin-top:6px">Captions are machine-generated and may contain mistakes. Words the avatar doesn't know are shown in amber and not signed; struck-out words were skipped to keep up. Speech recognition uses Google's service (internet needed); subtitle files work offline.</div>
+    </section>
+
+    <section id="playbackSec">
+      <h2>Playback</h2>
+      <div class="row" style="margin-top:0">
+        <label for="speed">Speed</label>
+        <input type="range" id="speed" min="0.5" max="1.5" step="0.05" value="1">
+        <span id="speedVal" class="sub">1.00×</span>
+        <label style="margin-left:auto"><input type="checkbox" id="skel"> bones</label>
+      </div>
+      <div class="row">
+        <button class="btn pill" id="viewFront">Front view</button>
+        <button class="btn pill" id="viewSide">Angled view</button>
+      </div>
+      <h2>Signs in the lexicon (click to play)</h2>
+      <div class="lex" id="lex"></div>
+    </section>
+
+    <div class="note">
+      <b>Prototype limits.</b> Camera recognition only knows signs you teach it, and is tuned to whoever recorded them. Signs are approximate placeholders built for testing the pipeline and must be checked and corrected by fluent Deaf ISL users before any real use. Word order follows the input text, not ISL grammar. No facial grammar yet. The current character is for private testing only.
+    </div>
+  </aside>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { initCamera, leaveCamera } from './camera.js';
+import { initLive, leaveLive, enterLive } from './live.js';
+
+const $ = s => document.querySelector(s);
+const V3 = (x=0,y=0,z=0) => new THREE.Vector3(x,y,z);
+const status = t => { $('#status').textContent = t; };
+
+/* ---------------- renderer / scene ---------------- */
+const stage = $('#stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 1, 0.1, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false; controls.minDistance = 4; controls.maxDistance = 18;
+controls.minPolarAngle = Math.PI*0.22; controls.maxPolarAngle = Math.PI*0.62;
+controls.minAzimuthAngle = -Math.PI*0.5; controls.maxAzimuthAngle = Math.PI*0.5;
+function frontView(){ camera.position.set(0, 5.6, 11.2); controls.target.set(0, 5.45, 0); controls.update(); }
+function sideView(){ camera.position.set(-5.6, 5.8, 9.6); controls.target.set(0, 5.45, 0); controls.update(); }
+frontView();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x2a3440, 1.5));
+const keyL = new THREE.DirectionalLight(0xffffff, 2.2); keyL.position.set(3, 9, 8); scene.add(keyL);
+const fillL = new THREE.DirectionalLight(0x9fc3ff, 0.9); fillL.position.set(-6, 4, 4); scene.add(fillL);
+const rimL = new THREE.DirectionalLight(0xffffff, 0.8); rimL.position.set(0, 6, -6); scene.add(rimL);
+function resize(){ const w = stage.clientWidth, h = stage.clientHeight; renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+/* ---------------- rig setup (geometry-derived, axis-convention free) ---------------- */
+const BN = n => THREE.PropertyBinding.sanitizeNodeName(n);
+const FINGERS = ['index','middle','ring','pinky'];
+let RIG = null, skelHelper = null;
+// Landmarks measured on this character in Blender (converted to Y-up), corrected at load by the head bone.
+const LM_RAW = {
+  mouth:[0,5.80,0.66], chin:[0,5.47,0.62], nose:[0,6.02,0.80], eyes:[0,6.30,0.66], forehead:[0,6.70,0.62],
+  chest:[0,4.62,0.28], stomach:[0,4.05,0.27], ns:[0,4.55,0.95], shoulder:[0,4.95,0.20]
+};
+const HEAD_EXPECTED = V3(0, 5.708, -0.25);
+const LM = {};
+
+function setupRig(root, parser){
+  root.updateMatrixWorld(true);
+  // Map original glTF node names -> objects (the loader renames duplicates, so look up by source name; prefer bones)
+  const byName = new Map();
+  root.traverse(o => {
+    const a = parser && parser.associations.get(o);
+    const nm = a && a.nodes !== undefined ? parser.json.nodes[a.nodes].name : null;
+    if (nm && (!byName.has(nm) || (o.isBone && !byName.get(nm).isBone))) byName.set(nm, o);
+  });
+  const get = n => { const o = byName.get(n) || root.getObjectByName(BN(n)); if (!o) throw new Error('Bone not found: ' + n); return o; };
+  const wp = o => o.getWorldPosition(V3());
+  const wq = o => o.getWorldQuaternion(new THREE.Quaternion());
+  const ws = o => o.getWorldScale(V3());
+  const corr = wp(get('head.x')).sub(HEAD_EXPECTED);
+  for (const [k, v] of Object.entries(LM_RAW)) LM[k] = V3(...v).add(corr);
+
+  const sides = {};
+  for (const [s, side] of [['r', -1], ['l', 1]]) {
+    const H = { side };
+    // Upper arm = two deform bones in this rig: c_arm_twist_offset (shoulder half) + arm_stretch (elbow half)
+    H.arm0 = get('c_arm_twist_offset.'+s);
+    H.arm = get('arm_stretch.'+s); H.fore = get('forearm_stretch.'+s); H.twist = get('forearm_twist.'+s); H.hand = get('hand.'+s);
+    H.S = wp(H.arm0); const E = wp(H.fore); const W = wp(H.hand);
+    H.armOff = wp(H.arm).sub(H.S); H.qArm0 = wq(H.arm0); H.sArm0 = ws(H.arm0);
+    H.a = E.distanceTo(H.S); H.b = W.distanceTo(E);
+    H.dU = E.clone().sub(H.S).normalize(); H.dF = W.clone().sub(E).normalize();
+    H.qArm = wq(H.arm); H.qFore = wq(H.fore); H.qHand = wq(H.hand);
+    H.sArm = ws(H.arm); H.sFore = ws(H.fore); H.sHand = ws(H.hand);
+    H.twistRest = H.twist.quaternion.clone();
+    H.foreAxisLocal = H.dF.clone().applyQuaternion(H.qFore.clone().invert());
+    H.restRelFH = H.qFore.clone().invert().multiply(H.qHand);
+
+    H.f = {};
+    for (const f of FINGERS) H.f[f] = [get(f+'1.'+s), get('c_'+f+'2.'+s), get('c_'+f+'3.'+s)];
+    H.t = [get('thumb1.'+s), get('c_thumb2.'+s), get('c_thumb3.'+s)];
+
+    const Fdir = wp(H.f.middle[0]).sub(W).normalize();
+    const P = wp(H.f.pinky[0]).sub(wp(H.f.index[0])).normalize();            // toward pinky side
+    let Np = V3().crossVectors(Fdir, P).multiplyScalar(-side);               // palm normal (verified in Blender)
+    Np.addScaledVector(Fdir, -Np.dot(Fdir)).normalize();
+    const invH = H.qHand.clone().invert();
+    H.aF = Fdir.clone().applyQuaternion(invH);
+    H.aN = Np.clone().applyQuaternion(invH);
+    H.aB = V3().crossVectors(H.aF, H.aN);
+    H.Lh = wp(H.f.middle[2]).distanceTo(W) + wp(H.f.middle[2]).distanceTo(wp(H.f.middle[1]));
+
+    const localAxis = (bone, worldAxis) => worldAxis.clone().applyQuaternion(wq(bone).invert()).normalize();
+    H.curl = {}; H.spread = {}; H.rest = new Map();
+    for (const f of FINGERS) {
+      const b = H.f[f]; H.curl[f] = [];
+      for (let j = 0; j < 3; j++) {
+        const from = wp(b[j]); const to = j < 2 ? wp(b[j+1]) : wp(b[j]).add(wp(b[j]).sub(wp(b[j-1])));
+        const r = to.sub(from).normalize();
+        H.curl[f].push(localAxis(b[j], V3().crossVectors(r, Np)));
+        H.rest.set(b[j], b[j].quaternion.clone());
+      }
+      const r0 = wp(b[1]).sub(wp(b[0])).normalize();
+      H.spread[f] = localAxis(b[0], V3().crossVectors(r0, P.clone().negate()));     // + = toward thumb
+    }
+    const flexDir = Np.clone().multiplyScalar(0.6).add(P).normalize();
+    const oppDir = Np.clone().add(P.clone().multiplyScalar(0.5)).normalize();
+    H.tAx = [];
+    for (let j = 0; j < 3; j++) {
+      const b = H.t[j];
+      const from = wp(b); const to = j < 2 ? wp(H.t[j+1]) : wp(b).add(wp(b).sub(wp(H.t[j-1])));
+      const r = to.sub(from).normalize();
+      H.tAx.push(localAxis(b, V3().crossVectors(r, j === 0 ? oppDir : flexDir)));
+      H.rest.set(b, b.quaternion.clone());
+    }
+    sides[s] = H;
+  }
+  return sides;
+}
+
+/* ---------------- pose maths ---------------- */
+const _m = new THREE.Matrix4(), _pi = new THREE.Matrix4();
+function setBoneWorld(bone, q, p, s){
+  _m.compose(p, q, s); _pi.copy(bone.parent.matrixWorld).invert(); _m.premultiply(_pi);
+  _m.decompose(bone.position, bone.quaternion, bone.scale);
+}
+function handQuat(H, F, N){
+  const f = F.clone().normalize();
+  const n = N.clone().addScaledVector(f, -N.dot(f));
+  if (n.lengthSq() < 1e-6) n.set(0, 0, 1).addScaledVector(f, -f.z);
+  n.normalize();
+  const b = V3().crossVectors(f, n);
+  const aN = H.aN.clone().addScaledVector(H.aF, -H.aN.dot(H.aF)).normalize();
+  const aB = V3().crossVectors(H.aF, aN);
+  const Mw = new THREE.Matrix4().makeBasis(f, n, b);
+  const Ml = new THREE.Matrix4().makeBasis(H.aF, aN, aB).transpose();
+  return { q: new THREE.Quaternion().setFromRotationMatrix(Mw.multiply(Ml)), f, n };
+}
+function solveArm(H, T){
+  const d = T.clone().sub(H.S); let dist = d.length(); d.normalize();
+  dist = THREE.MathUtils.clamp(dist, Math.abs(H.a - H.b) + 0.02, (H.a + H.b) * 0.998);
+  const Tc = H.S.clone().addScaledVector(d, dist);
+  const cosA = (H.a*H.a + dist*dist - H.b*H.b) / (2*H.a*dist);
+  const sinA = Math.sqrt(Math.max(0, 1 - cosA*cosA));
+  const pole = V3(H.side*0.55, -1, -0.35);
+  const p = pole.addScaledVector(d, -pole.dot(d)).normalize();
+  const E = H.S.clone().addScaledVector(d, H.a*cosA).addScaledVector(p, H.a*sinA);
+  return { E, Tc };
+}
+const _qa = new THREE.Quaternion();
+function axisQ(axis, ang){ return _qa.setFromAxisAngle(axis, ang); }
+function applyHand(H, st){
+  const { E, Tc } = solveArm(H, st.W);
+  const dU = new THREE.Quaternion().setFromUnitVectors(H.dU, E.clone().sub(H.S).normalize());
+  setBoneWorld(H.arm0, dU.clone().multiply(H.qArm0), H.S, H.sArm0);
+  setBoneWorld(H.arm, dU.clone().multiply(H.qArm), H.S.clone().add(H.armOff.clone().applyQuaternion(dU)), H.sArm);
+  const dF0 = H.dF.clone().applyQuaternion(dU);
+  const dF = new THREE.Quaternion().setFromUnitVectors(dF0, Tc.clone().sub(E).normalize());
+  const qF = dF.multiply(dU).multiply(H.qFore);
+  setBoneWorld(H.fore, qF, E, H.sFore);
+  setBoneWorld(H.hand, st.q, Tc, H.sHand);
+  // half of the wrist roll goes to the forearm twist bone (reduces candy-wrapping)
+  const rel = qF.clone().invert().multiply(st.q).multiply(H.restRelFH.clone().invert());
+  const ax = H.foreAxisLocal; const dot = rel.x*ax.x + rel.y*ax.y + rel.z*ax.z;
+  const tw = new THREE.Quaternion(ax.x*dot, ax.y*dot, ax.z*dot, rel.w).normalize();
+  const half = new THREE.Quaternion().slerp(tw, 0.5);
+  H.twist.quaternion.copy(half).multiply(H.twistRest);
+  // fingers
+  const sh = st.sh;
+  for (const f of FINGERS) {
+    const b = H.f[f], c = sh[f[0]];
+    for (let j = 0; j < 3; j++) {
+      b[j].quaternion.copy(H.rest.get(b[j])).multiply(axisQ(H.curl[f][j], c[j]));
+    }
+    const sp = sh.s * ({index:1, middle:0.25, ring:-0.55, pinky:-1})[f];
+    b[0].quaternion.multiply(axisQ(H.spread[f], sp));
+  }
+  const t = H.t;
+  t[0].quaternion.copy(H.rest.get(t[0])).multiply(axisQ(H.tAx[0], sh.t[0]));
+  t[1].quaternion.copy(H.rest.get(t[1])).multiply(axisQ(H.tAx[1], sh.t[1]));
+  t[2].quaternion.copy(H.rest.get(t[2])).multiply(axisQ(H.tAx[2], sh.t[1]*0.8));
+}
+
+/* ---------------- handshapes (radians per joint: base, middle, tip) ---------------- */
+const FIST = [1.45, 1.55, 1.0], STR = [0, 0, 0];
+const SHAPES = {
+  relaxed: { i:[0.25,0.3,0.15], m:[0.3,0.35,0.2], r:[0.35,0.4,0.2], p:[0.4,0.4,0.2], t:[0.1,0.15], s:0 },
+  flat:    { i:STR, m:STR, r:STR, p:STR, t:[0.35,0.15], s:0 },
+  open5:   { i:STR, m:STR, r:STR, p:STR, t:[-0.25,-0.1], s:0.2 },
+  fist:    { i:FIST, m:FIST, r:FIST, p:FIST, t:[0.6,0.7], s:0 },
+  point:   { i:STR, m:FIST, r:FIST, p:FIST, t:[0.7,0.8], s:0 },
+  thumb:   { i:FIST, m:FIST, r:FIST, p:FIST, t:[-0.15,-0.25], s:0 },
+  V:       { i:STR, m:STR, r:FIST, p:FIST, t:[0.7,0.8], s:0.3 },
+  H:       { i:STR, m:STR, r:FIST, p:FIST, t:[0.7,0.8], s:0 },
+  three:   { i:STR, m:STR, r:STR, p:FIST, t:[0.8,0.8], s:0.2 },
+  four:    { i:STR, m:STR, r:STR, p:STR, t:[0.95,0.6], s:0.15 },
+  C:       { i:[0.5,0.6,0.4], m:[0.5,0.6,0.4], r:[0.5,0.6,0.4], p:[0.5,0.6,0.4], t:[0.35,0.2], s:0 },
+  flatO:   { i:[0.95,0.5,0.3], m:[0.95,0.5,0.3], r:[0.95,0.5,0.3], p:[0.95,0.5,0.3], t:[0.8,0.5], s:0 },
+  O:       { i:[1.0,0.9,0.6], m:[1.0,0.9,0.6], r:[1.0,0.9,0.6], p:[1.0,0.9,0.6], t:[0.8,0.6], s:0 },
+  hook:    { i:[0.2,1.3,1.0], m:FIST, r:FIST, p:FIST, t:[0.7,0.8], s:0 },
+};
+function lerpShape(a, b, k){
+  const L = (x, y) => x + (y - x)*k, A = (x, y) => x.map((v, i) => L(v, y[i]));
+  return { i:A(a.i,b.i), m:A(a.m,b.m), r:A(a.r,b.r), p:A(a.p,b.p), t:A(a.t,b.t), s:L(a.s,b.s) };
+}
+
+/* ---------------- sign lexicon (APPROXIMATE — needs ISL reviewer sign-off) ---------------- */
+// Hand spec: landmark, offset [outward, up, forward], fingers direction, palm direction, handshape, contact point
+const H_ = (at, o, f, n, s, c='palm') => ({ at, o, f, n, s, c });
+const K = (d, R, L) => ({ d, R, L });
+const NS = 'ns';
+const SIGNS = {
+  HELLO:{ w:['hello','hi','hey','namaste','hii'], k:[
+    K(.40, H_('forehead',[0.35,-0.05,0.05],'up','fwd','flat','tips')),
+    K(.35, H_('forehead',[0.85,-0.25,0.35],'up+out','fwd','flat','tips')),
+    K(.25, H_('forehead',[0.70,-0.25,0.30],'up','fwd','flat','tips'))]},
+  THANK_YOU:{ w:['thanks','thank','thankyou','thx'], k:[
+    K(.40, H_('chin',[0.02,0,0.04],'up','back','flat','tips')),
+    K(.50, H_(NS,[0.12,0.25,0.35],'fwd+up','up','flat'))]},
+  YES:{ w:['yes','yeah','yep','ok','okay'], k:[
+    K(.30, H_(NS,[0.2,0.2,0],'fwd','in','fist')),
+    K(.18, H_(NS,[0.2,0.12,0.02],'fwd+down','in','fist')),
+    K(.18, H_(NS,[0.2,0.2,0],'fwd','in','fist')),
+    K(.18, H_(NS,[0.2,0.12,0.02],'fwd+down','in','fist')),
+    K(.18, H_(NS,[0.2,0.2,0],'fwd','in','fist'))]},
+  NO:{ w:['no','not','nope','dont','cant','never'], k:[
+    K(.30, H_(NS,[0.25,0.45,0],'up','fwd','point')),
+    K(.16, H_(NS,[0.12,0.45,0],'up+in','fwd','point')),
+    K(.16, H_(NS,[0.38,0.45,0],'up+out','fwd','point')),
+    K(.16, H_(NS,[0.12,0.45,0],'up+in','fwd','point')),
+    K(.16, H_(NS,[0.25,0.45,0],'up','fwd','point'))]},
+  PLEASE:{ w:['please','pls','plz','kindly'], k:[
+    K(.35, H_('chest',[0.12,0.10,0],'up+in','back','flat')),
+    K(.18, H_('chest',[0.28,0.0,0],'up+in','back','flat')),
+    K(.18, H_('chest',[0.12,-0.12,0],'up+in','back','flat')),
+    K(.18, H_('chest',[-0.04,0.0,0],'up+in','back','flat')),
+    K(.18, H_('chest',[0.12,0.10,0],'up+in','back','flat'))]},
+  SORRY:{ w:['sorry','apologise','apologize','apology'], k:[
+    K(.35, H_('chest',[0.12,0.10,0],'up+in','back','fist')),
+    K(.18, H_('chest',[0.28,0.0,0],'up+in','back','fist')),
+    K(.18, H_('chest',[0.12,-0.12,0],'up+in','back','fist')),
+    K(.18, H_('chest',[-0.04,0.0,0],'up+in','back','fist')),
+    K(.18, H_('chest',[0.12,0.10,0],'up+in','back','fist'))]},
+  HELP:{ w:['help','helping','assist','support'], k:[
+    K(.40, H_(NS,[0.05,0.08,0.05],'fwd','in','thumb'), H_(NS,[0.05,-0.05,0.05],'fwd+in','up','flat')),
+    K(.45, H_(NS,[0.05,0.38,0.12],'fwd','in','thumb'), H_(NS,[0.05,0.25,0.12],'fwd+in','up','flat'))]},
+  GOOD:{ w:['good','great','nice','well','fine','best'], k:[
+    K(.35, H_(NS,[0.22,0.15,0],'fwd','in','thumb')),
+    K(.30, H_(NS,[0.22,0.2,0.3],'fwd','in','thumb'))]},
+  BAD:{ w:['bad','wrong','worst'], k:[
+    K(.35, H_(NS,[0.22,0.15,0],'fwd','out','thumb')),
+    K(.30, H_(NS,[0.22,-0.1,0.2],'fwd','out','thumb'))]},
+  ME:{ w:['i','me','my','mine','im','myself'], k:[
+    K(.30, H_('chest',[0.08,0.05,0.08],'back','in','point','tips')),
+    K(.15, H_('chest',[0.08,0.05,0.22],'back','in','point','tips')),
+    K(.15, H_('chest',[0.08,0.05,0.08],'back','in','point','tips'))]},
+  YOU:{ w:['you','your','yours','u','ur','youre'], k:[
+    K(.30, H_(NS,[0.15,0.25,0.15],'fwd','in','point','tips')),
+    K(.25, H_(NS,[0.12,0.25,0.5],'fwd','in','point','tips'))]},
+  WHAT:{ w:['what','whats'], k:[
+    K(.35, H_(NS,[0.45,0.05,0.1],'fwd','up','open5'), H_(NS,[0.45,0.05,0.1],'fwd','up','open5')),
+    K(.18, H_(NS,[0.58,0.05,0.12],'fwd+out','up','open5'), H_(NS,[0.58,0.05,0.12],'fwd+out','up','open5')),
+    K(.18, H_(NS,[0.45,0.05,0.1],'fwd','up','open5'), H_(NS,[0.45,0.05,0.1],'fwd','up','open5'))]},
+  WHERE:{ w:['where','wheres'], k:[
+    K(.35, H_(NS,[0.3,0.1,0.15],'fwd','up','flat'), H_(NS,[0.3,0.1,0.15],'fwd','up','flat')),
+    K(.25, H_(NS,[0.6,0.1,0.2],'fwd+out','up','flat'), H_(NS,[0.6,0.1,0.2],'fwd+out','up','flat')),
+    K(.25, H_(NS,[0.3,0.1,0.15],'fwd','up','flat'), H_(NS,[0.3,0.1,0.15],'fwd','up','flat'))]},
+  NAME:{ w:['name','named','called'], k:[
+    K(.35, H_(NS,[0.05,0.2,0.15],'in+fwd','in','H'), H_(NS,[0.05,0.05,0.12],'in+fwd','back','H')),
+    K(.15, H_(NS,[0.05,0.1,0.15],'in+fwd','in','H'), H_(NS,[0.05,0.05,0.12],'in+fwd','back','H')),
+    K(.15, H_(NS,[0.05,0.2,0.15],'in+fwd','in','H'), H_(NS,[0.05,0.05,0.12],'in+fwd','back','H')),
+    K(.15, H_(NS,[0.05,0.1,0.15],'in+fwd','in','H'), H_(NS,[0.05,0.05,0.12],'in+fwd','back','H'))]},
+  EAT:{ w:['eat','eating','food','hungry','lunch','dinner','breakfast'], k:[
+    K(.35, H_('mouth',[0.03,0.12,0.18],'back+up','down','flatO','tips')),
+    K(.15, H_('mouth',[0.03,0.12,0.03],'back+up','down','flatO','tips')),
+    K(.15, H_('mouth',[0.03,0.12,0.18],'back+up','down','flatO','tips')),
+    K(.15, H_('mouth',[0.03,0.12,0.03],'back+up','down','flatO','tips'))]},
+  DRINK:{ w:['drink','water','thirsty','tea','coffee'], k:[
+    K(.35, H_('chin',[0.05,-0.05,0.2],'in','back','C','tips')),
+    K(.35, H_('chin',[0.05,0.05,0.12],'in+up','back','C','tips'))]},
+  COME:{ w:['come','coming','here','came'], k:[
+    K(.30, H_(NS,[0.2,0.3,0.55],'up+fwd','back','point')),
+    K(.25, H_(NS,[0.2,0.3,0.15],'up','back','point')),
+    K(.20, H_(NS,[0.2,0.3,0.45],'up+fwd','back','point')),
+    K(.25, H_(NS,[0.2,0.3,0.15],'up','back','point'))]},
+  GO:{ w:['go','going','went','leave','gone'], k:[
+    K(.30, H_(NS,[0.2,0.2,0.05],'fwd','in','point')),
+    K(.35, H_(NS,[0.45,0.35,0.6],'fwd+out','in','point'))]},
+  STOP:{ w:['stop','wait','hold','halt'], k:[
+    K(.30, H_(NS,[0.2,0.35,0.0],'up','fwd','flat')),
+    K(.25, H_(NS,[0.2,0.35,0.35],'up','fwd','flat'))]},
+  FRIEND:{ w:['friend','friends','buddy','pal'], k:[
+    K(.35, H_(NS,[0.0,0.14,0.15],'in','down','hook'), H_(NS,[0.0,0.0,0.15],'in','up','hook')),
+    K(.25, H_(NS,[0.0,0.0,0.15],'in','up','hook'), H_(NS,[0.0,0.14,0.15],'in','down','hook'))]},
+  LOVE:{ w:['love','like','loves','liked'], k:[
+    K(.40, H_('chest',[-0.12,0.05,0.08],'up+in','back','fist'), H_('chest',[-0.12,-0.02,0.12],'up+in','back','fist')),
+    K(.30, H_('chest',[-0.12,0.05,0.04],'up+in','back','fist'), H_('chest',[-0.12,-0.02,0.08],'up+in','back','fist'))]},
+  HOME:{ w:['home','house','hostel'], k:[
+    K(.40, H_(NS,[0.02,0.6,0.1],'up+in','down+in','flat','tips'), H_(NS,[0.02,0.6,0.1],'up+in','down+in','flat','tips')),
+    K(.40, H_(NS,[0.35,0.2,0.1],'up','in','flat','tips'), H_(NS,[0.35,0.2,0.1],'up','in','flat','tips'))]},
+  BYE:{ w:['bye','goodbye','byebye','tata'], k:[
+    K(.30, H_('shoulder',[0.55,0.25,0.25],'up','fwd','open5')),
+    K(.16, H_('shoulder',[0.42,0.25,0.25],'up+in','fwd','open5')),
+    K(.16, H_('shoulder',[0.68,0.25,0.25],'up+out','fwd','open5')),
+    K(.16, H_('shoulder',[0.42,0.25,0.25],'up+in','fwd','open5')),
+    K(.16, H_('shoulder',[0.55,0.25,0.25],'up','fwd','open5'))]},
+  OKAY:{ w:['alright','correct','right'], k:[
+    K(.30, H_(NS,[0.3,0.45,0.05],'up','fwd','O')),
+    K(.20, H_(NS,[0.3,0.45,0.2],'up','fwd','O'))]},
+  ONE:{ w:['one','1','first'], k:[K(.35, H_('shoulder',[0.4,0.15,0.3],'up','back','point'))]},
+  TWO:{ w:['two','2','second'], k:[K(.35, H_('shoulder',[0.4,0.15,0.3],'up','back','V'))]},
+  THREE:{ w:['three','3','third'], k:[K(.35, H_('shoulder',[0.4,0.15,0.3],'up','back','three'))]},
+  FOUR:{ w:['four','4'], k:[K(.35, H_('shoulder',[0.4,0.15,0.3],'up','back','four'))]},
+  FIVE:{ w:['five','5'], k:[K(.35, H_('shoulder',[0.4,0.15,0.3],'up','back','open5'))]},
+};
+const PHRASES = { 'thank you':'THANK_YOU', 'good bye':'BYE', 'see you':'BYE', 'excuse me':'SORRY' };
+const STOP = new Set(['a','an','the','is','am','are','was','were','be','been','being','to','of','do','does','did','will','shall','would','should','could','can','and','or','but','so','very','just','that','this','it','its','at','in','on','for','with','as','by','from','up','oh','um','uh']);
+const WORDMAP = {};
+for (const [id, def] of Object.entries(SIGNS)) { WORDMAP[id.toLowerCase().replace('_','')] = id; for (const w of def.w) WORDMAP[w] = id; }
+function glossify(text){
+  const words = text.toLowerCase().replace(/[’'`]/g, '').replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < words.length; i++) {
+    const two = words[i] + ' ' + (words[i+1] || '');
+    if (PHRASES[two]) { out.push({ word: two, sign: PHRASES[two] }); i++; continue; }
+    const w = words[i];
+    if (STOP.has(w) && !WORDMAP[w]) continue;
+    out.push({ word: w, sign: WORDMAP[w] || null });
+  }
+  return out;
+}
+
+/* ---------------- resolving specs into poses ---------------- */
+function dirVec(d, side){
+  const base = { up:[0,1,0], down:[0,-1,0], fwd:[0,0,1], back:[0,0,-1], out:[1,0,0], in:[-1,0,0] };
+  let v = [0,0,0];
+  for (const k of d.split('+')) { const b = base[k]; v = [v[0]+b[0], v[1]+b[1], v[2]+b[2]]; }
+  return V3(v[0]*side, v[1], v[2]).normalize();
+}
+function idlePose(H){
+  const { q } = handQuat(H, dirVec('down+fwd', H.side).add(V3(0,-2,0)).normalize(), dirVec('in', H.side));
+  return { W: H.S.clone().add(V3(H.side*0.42, -1.22, 0.5)), q, sh: SHAPES.relaxed };
+}
+function resolve(spec, H){
+  const T = LM[spec.at].clone().add(V3(spec.o[0]*H.side, spec.o[1], spec.o[2]));
+  const { q, f, n } = handQuat(H, dirVec(spec.f, H.side), dirVec(spec.n, H.side));
+  const W = T.clone();
+  if (spec.c === 'palm') W.addScaledVector(f, -0.45*H.Lh).addScaledVector(n, -0.07*H.Lh);
+  else if (spec.c === 'tips') W.addScaledVector(f, -H.Lh * (REACH[spec.s] ?? 1));
+  return { W, q, sh: SHAPES[spec.s] };
+}
+// how far the fingertips extend from the wrist for each handshape (curled hands are shorter)
+const REACH = { fist:0.45, thumb:0.45, O:0.6, flatO:0.68, C:0.8, hook:0.62 };
+const clonePose = p => ({ W: p.W.clone(), q: p.q.clone(), sh: p.sh });
+
+/* ---------------- player ---------------- */
+const cur = {}; let queue = [], step = null, speed = 1, boost = 1, lastText = '', idleT = 0, atRest = true;
+const capEl = $('#caption'); let chips = [];
+function addChip(tok){
+  const el = document.createElement('span');
+  el.className = 'chip' + (tok.sign ? '' : ' unknown'); el.textContent = tok.word;
+  el.title = tok.sign ? 'Sign: ' + tok.sign.replace('_',' ') : 'Not in lexicon yet — not signed';
+  capEl.appendChild(el); chips.push(el);
+  while (chips.length > 28) { chips.shift().remove(); }
+  return el;
+}
+function clearAll(){ queue = []; step = null; capEl.innerHTML = ''; chips = []; activeChip = null; }
+function enqueue(tokens, opts={}){
+  if (opts.clear) clearAll();
+  for (const t of tokens) {
+    const el = addChip(t);
+    if (t.sign) {
+      SIGNS[t.sign].k.forEach((key, j) => queue.push({ R:key.R, L:key.L ?? null, d:key.d, chip: j === 0 ? el : null }));
+      queue.push({ R:'hold', L:'hold', d:0.1 });
+    } else {
+      queue.push({ R:'hold', L:'hold', d:0.55, chip: el });
+    }
+  }
+  if (opts.rest !== false) queue.push({ R:null, L:null, d:0.6, chip:null, rest:true });
+}
+// seconds of signing still waiting (at the current playback speed)
+function backlog(){ let t = step ? Math.max(0, step.d - step.t) : 0; for (const q of queue) t += q.d; return t / (speed * boost); }
+// live mode: drop whole queued words from the front until the backlog is short enough (captions keep everything)
+function dropToNewest(target){
+  let dropped = 0;
+  while (backlog() > target && queue.length) {
+    let i = 1; while (i < queue.length && !queue[i].chip && !queue[i].rest) i++;
+    if (i >= queue.length) break;
+    for (const q of queue.splice(0, i)) if (q.chip) { q.chip.classList.add('skipped'); dropped++; }
+  }
+  return dropped;
+}
+let activeChip = null;
+function startStep(s){
+  if (s.chip) { if (activeChip) { activeChip.classList.remove('active'); activeChip.classList.add('done'); } activeChip = s.chip; s.chip.classList.add('active'); }
+  if (s.rest && activeChip) { activeChip.classList.remove('active'); activeChip.classList.add('done'); activeChip = null; }
+  atRest = !!s.rest || (s.R === null && s.L === null);
+  s.t = 0; s.from = {}; s.to = {};
+  for (const k of ['r','l']) {
+    const H = RIG[k]; const spec = k === 'r' ? s.R : s.L;
+    s.from[k] = clonePose(cur[k]);
+    s.to[k] = spec === 'hold' ? clonePose(cur[k]) : spec ? resolve(spec, H) : idlePose(H);
+  }
+}
+const ease = x => x*x*(3 - 2*x);
+function update(dt){
+  if (!step && queue.length) { step = queue.shift(); startStep(step); }
+  // hands return to rest by themselves when nothing new arrives for a moment (live mode queues without rests)
+  if (!step && !queue.length) { idleT += dt; if (idleT > 0.9 && !atRest) queue.push({ R:null, L:null, d:0.6, chip:null, rest:true }); } else idleT = 0;
+  if (step) {
+    step.t += dt*speed*boost; const k = ease(Math.min(1, step.t/step.d));
+    for (const h of ['r','l']) {
+      const a = step.from[h], b = step.to[h];
+      cur[h] = { W: a.W.clone().lerp(b.W, k), q: a.q.clone().slerp(b.q, k), sh: lerpShape(a.sh, b.sh, k) };
+    }
+    if (step.t >= step.d) step = null;
+  }
+  applyHand(RIG.r, cur.r); applyHand(RIG.l, cur.l);
+}
+
+/* ---------------- loading ---------------- */
+const IDB = { db: null,
+  open(){ return new Promise((res, rej) => { const r = indexedDB.open('isl-avatar', 1); r.onupgradeneeded = () => r.result.createObjectStore('files'); r.onsuccess = () => res(this.db = r.result); r.onerror = () => rej(r.error); }); },
+  async get(k){ try { const db = this.db || await this.open(); return await new Promise(res => { const q = db.transaction('files').objectStore('files').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); }); } catch { return null; } },
+  async set(k, v){ try { const db = this.db || await this.open(); db.transaction('files', 'readwrite').objectStore('files').put(v, k); } catch {} }
+};
+const loader = new GLTFLoader();
+function parseGLB(buf){
+  return new Promise((res, rej) => loader.parse(buf, '', res, rej));
+}
+async function useGLB(buf){
+  const gltf = await parseGLB(buf);
+  const root = gltf.scene;
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; if (o.material) o.material.side = THREE.FrontSide; } });
+  scene.add(root);
+  // Repair exports where a bone sub-tree was left without a parent (Blender exporter quirk with Auto-Rig Pro)
+  root.traverse(o => {
+    if (!o.isSkinnedMesh) return;
+    const bones = o.skeleton.bones;
+    const armature = (bones.find(b => b.parent && !b.parent.isBone) || {}).parent;
+    if (armature) for (const b of bones) if (!b.parent) armature.add(b);
+  });
+  root.updateMatrixWorld(true);
+  RIG = setupRig(root, gltf.parser);
+  for (const k of ['r','l']) cur[k] = idlePose(RIG[k]);
+  skelHelper = new THREE.SkeletonHelper(root); skelHelper.visible = $('#skel').checked; scene.add(skelHelper);
+  $('#loader').classList.remove('show');
+  status('Avatar ready · ' + Object.keys(SIGNS).length + ' signs in lexicon');
+}
+async function boot(){
+  try {
+    const r = await fetch('avatar.glb'); if (!r.ok) throw new Error('HTTP ' + r.status);
+    await useGLB(await r.arrayBuffer()); return;
+  } catch (e) { console.warn('fetch failed', e); }
+  const cached = await IDB.get('avatar.glb');
+  if (cached) { try { await useGLB(cached); return; } catch (e) { console.warn(e); } }
+  status('Avatar not loaded'); $('#loader').classList.add('show');
+}
+$('#glbInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const buf = await f.arrayBuffer(); await useGLB(buf); IDB.set('avatar.glb', buf); }
+  catch (err) { $('#loadErr').textContent = 'Could not load: ' + err.message; }
+});
+
+/* ---------------- UI ---------------- */
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  const t = b.dataset.tab;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+  for (const id of ['text', 'speech', 'camera', 'live']) $('#tab-' + id).classList.toggle('hidden', t !== id);
+  $('#playbackSec').classList.toggle('hidden', t === 'camera');
+  $('#camView').classList.toggle('hidden', t !== 'camera');
+  document.body.classList.toggle('camera-on', t === 'camera');
+  if (t !== 'speech' && listening) stopRec();
+  if (t !== 'camera') leaveCamera();
+  if (t !== 'live') leaveLive(); else { if (listening) stopRec(); enterLive(); }
+});
+initCamera(Object.keys(SIGNS).map(id => id.replace('_', ' ').toLowerCase()));
+initLive({ enqueue, glossify, backlog, dropToNewest, clearAll, setBoost: b => { boost = b; } });
+const signText = t => { if (!RIG || !t.trim()) return; lastText = t; enqueue(glossify(t), { clear:true }); };
+$('#signBtn').onclick = () => signText($('#textIn').value);
+$('#textIn').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) signText(e.target.value); });
+$('#replayBtn').onclick = () => signText(lastText || $('#textIn').value);
+$('#stopBtn').onclick = () => { clearAll(); queue.push({ R:null, L:null, d:0.5, rest:true }); };
+document.querySelectorAll('.ex').forEach(b => b.onclick = () => { $('#textIn').value = b.textContent; signText(b.textContent); });
+$('#speed').oninput = e => { speed = +e.target.value; $('#speedVal').textContent = speed.toFixed(2) + '×'; };
+$('#skel').onchange = e => { if (skelHelper) skelHelper.visible = e.target.checked; };
+$('#viewFront').onclick = frontView; $('#viewSide').onclick = sideView;
+const lex = $('#lex');
+for (const id of Object.keys(SIGNS)) {
+  const b = document.createElement('button'); b.className = 'btn'; b.textContent = id.replace('_',' ').toLowerCase();
+  b.onclick = () => { if (RIG) enqueue([{ word: b.textContent, sign: id }], { clear:true }); };
+  lex.appendChild(b);
+}
+
+/* ---------------- speech recognition ---------------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+const micBtn = $('#micBtn'), micHelp = $('#micHelp');
+function showHelp(html){ micHelp.innerHTML = html; micHelp.classList.remove('hidden'); }
+if (!SR) { micBtn.disabled = true; showHelp('Speech recognition is not available in this browser. Please use <b>Google Chrome</b> or <b>Microsoft Edge</b>.'); }
+function setMic(on){ listening = on; micBtn.classList.toggle('live', on); micBtn.textContent = on ? '■ Stop listening' : 'Start listening'; }
+function startRec(){
+  if (!RIG) return;
+  rec = new SR(); rec.lang = $('#lang').value; rec.continuous = true; rec.interimResults = true;
+  rec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) { const t = r[0].transcript.trim(); if (t) { $('#finalTxt').textContent += t + '. '; $('#transcript').scrollTop = 1e9; enqueue(glossify(t)); } }
+      else interim += r[0].transcript;
+    }
+    $('#interim').textContent = interim;
+  };
+  rec.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { stopRec(); showHelp('Microphone access was blocked. Click the <b>lock / mic icon</b> in the address bar, set Microphone to <b>Allow</b>, then reload the page. Open the app through <b>start_app.bat</b> (http://localhost) — browsers may block the mic for pages opened directly from a file.'); }
+    else if (e.error === 'network') { showHelp('Speech recognition needs an internet connection (Chrome/Edge send audio to their speech service).'); }
+    else if (e.error !== 'no-speech' && e.error !== 'aborted') status('Speech error: ' + e.error);
+  };
+  rec.onend = () => { if (listening) { try { rec.start(); } catch {} } };
+  try { rec.start(); setMic(true); micHelp.classList.add('hidden'); } catch (err) { showHelp('Could not start speech recognition: ' + err.message); }
+}
+function stopRec(){ setMic(false); try { rec && rec.stop(); } catch {} $('#interim').textContent = ''; }
+micBtn.onclick = () => listening ? stopRec() : startRec();
+$('#lang').onchange = () => { if (listening) { stopRec(); startRec(); } };
+
+/* ---------------- loop ---------------- */
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (document.body.classList.contains('camera-on')) return;   // camera view covers the avatar: save GPU for hand tracking
+  if (RIG) update(dt);
+  controls.update();
+  renderer.render(scene, camera);
+});
+window.__isl = { get rig(){ return RIG; }, update, backlog, get boost(){ return boost; }, controls, SIGNS, SHAPES, resolve, idlePose, applyHand, enqueue, glossify, cur, scene, camera, renderer, THREE, LM };
+boot();
+</script>
+</body>
+</html>
